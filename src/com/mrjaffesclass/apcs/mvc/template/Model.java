@@ -1,6 +1,7 @@
 package com.mrjaffesclass.apcs.mvc.template;
 
 import com.mrjaffesclass.apcs.messenger.*;
+import java.util.Random;
 
 /**
  * The model represents the data that the app uses.
@@ -13,8 +14,11 @@ public class Model implements MessageHandler {
   private final Messenger mvcMessaging;
 
   // Model's data variables
-  private int variable1;
-  private int variable2;
+  private int gridSize;
+  
+  private int numMines;
+  private boolean[][] mineGrid;
+  
 
   /**
    * Model constructor: Create the data representation of the program
@@ -29,69 +33,134 @@ public class Model implements MessageHandler {
    * Initialize the model here and subscribe to any required messages
    */
   public void init() {
-    mvcMessaging.subscribe("controller:changeButton", this);
-    setVariable1(10);
-    setVariable2(-10);
+    mvcMessaging.subscribe("view:changeButton", this);
+    mvcMessaging.subscribe("view:newGameClicked", this);
+    mvcMessaging.subscribe("view:gameButtonClick", this);
+  
+    setGridSize(8);
+    setNumMines(10);
+    randomizeMines(getNumMines());
   }
+  
+  public void randomizeMines(int number) {
+    mineGrid = new boolean[getGridSize()][getGridSize()];
+    
+    for (int i=1; i<getGridSize(); i++)
+    {
+        
+        for (int j=1; j<getGridSize(); j++)
+        {
+            mineGrid[i][j] = false;
+            
+        }
+    }
+    //Arrays.fill(mineGrid,Boolean.FALSE);
+    Random randomGenerator = new Random();
+    for (int idx = 1; idx <= number; ++idx){
+        int x = randomGenerator.nextInt(getGridSize());
+        int y = randomGenerator.nextInt(getGridSize());
+        
+        mineGrid[x][y] = Boolean.TRUE;
+    }
+    mvcMessaging.notify("model:StartGame", gridSize, true);
+    
+  }
+  
+  
+  
+          
   
   @Override
   public void messageHandler(String messageName, Object messagePayload) {
     if (messagePayload != null) {
-      System.out.println("RCV (model): "+messageName+" | "+messagePayload.toString());
+      System.out.println("MSG: received by model: "+messageName+" | "+messagePayload.toString());
     } else {
-      System.out.println("RCV (model): "+messageName+" | No data sent");
+      System.out.println("MSG: received by model: "+messageName+" | No data sent");
     }
-    MessagePayload payload = (MessagePayload)messagePayload;
-    int field = payload.getField();
-    int direction = payload.getDirection();
     
-    if (direction == Constants.UP) {
-      if (field == 1) {
-        setVariable1(getVariable1()+Constants.UP);
-      } else {
-        setVariable2(getVariable2()+Constants.UP);
-      }
-    } else {
-      if (field == 1) {
-        setVariable1(getVariable1()+Constants.DOWN);
-      } else {
-        setVariable2(getVariable2()+Constants.DOWN);
-      }      
+    if (messageName == "view:gameButtonClick") {
+        MessagePayload payload = (MessagePayload)messagePayload;
+        int pCol = payload.getField();
+        int pRow = payload.getDirection();
+        if (mineGrid[pCol][pRow] == true) {
+            //hit a bomb
+            mvcMessaging.notify("model:hitABomb", new MessagePayload(pCol, pRow), true);
+        
+        }
+        else {
+            //hit a safe spot
+            mvcMessaging.notify("model:hitASafeSpot", new MessagePayload(pCol, pRow), true);
+        }
     }
+    else if (messageName == "view:newGameClicked") {
+        randomizeMines(getNumMines());
+    }
+    else {
+        MessagePayload payload = (MessagePayload)messagePayload;
+        int field = payload.getField();
+        int direction = payload.getDirection();
+    
+        if (direction == Constants.UP) {
+          if (field == 1) {
+            setGridSize(getGridSize()+Constants.FIELD_1_INCREMENT);
+            
+          } else {
+            setNumMines(getNumMines()+Constants.FIELD_2_INCREMENT);
+          }
+        } else {
+          if (field == 1) {
+            setGridSize(getGridSize()-Constants.FIELD_1_INCREMENT);
+            if(gridSize<1)
+                gridSize=1;
+          } else {
+            
+              setNumMines(getNumMines()-Constants.FIELD_2_INCREMENT);
+             if(numMines<1)
+                 numMines=0;
+          }      
+        }
+     }
   }
 
   /**
    * Getter function for variable 1
-   * @return Value of variable1
+   * @return Value of gridSize
    */
-  public int getVariable1() {
-    return variable1;
+  public int getGridSize() {
+    return gridSize;
   }
 
   /**
    * Setter function for variable 1
-   * @param v New value of variable1
+   * @param v New value of gridSize
    */
-  public void setVariable1(int v) {
-    variable1 = v;
-    mvcMessaging.notify("model:variable1Changed", variable1, true);
+  public void setGridSize(int v) {
+    gridSize = v;
+    // When we set a new value to variable 1 we need to also send a
+    // message to let other modules know that the variable value
+    // was changed
+    mvcMessaging.notify("model:gridSizeChanged", gridSize, true);
   }
   
   /**
    * Getter function for variable 1
-   * @return Value of variable2
+   * @return Value of numMines
    */
-  public int getVariable2() {
-    return variable2;
+  public int getNumMines() {
+    return numMines;
   }
   
   /**
    * Setter function for variable 2
    * @param v New value of variable 2
    */
-  public void setVariable2(int v) {
-    variable2 = v;
-    mvcMessaging.notify("model:variable2Changed", variable2, true);
+  public void setNumMines(int v) {
+    numMines = v;
+    
+    // When we set a new value to variable 2 we need to also send a
+    // message to let other modules know that the variable value
+    // was changed
+    mvcMessaging.notify("model:numMinesChanged", numMines, true);
   }
 
 }
